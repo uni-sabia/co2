@@ -1,0 +1,91 @@
+---
+title: "Analyzing changes in CO2 by Sector"
+author: "Uni Lee"
+date: "1/17/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(janitor)
+library(data.table)
+
+```
+
+# It's about time to step up the decarbonization effort in the transport sector!
+
+For years, I thought renewable energy was the "silver bullet" to solving the climate crisis. I campaigned for renewable energy for years at all kinds of organizations - Greenpeace, KFEM and small social enterprises promoting renewable energy solutions for developing countries. Renewable energy was my thing. 
+
+I knew in the back of my head that there was a lot of work to be done in other sectors, too. While energy is the most carbon intensive sector, other sectors should be decarbonized if we are really aiming for a net-zero world. 
+
+But, I was fixated on energy because change in the energy sector, in my opinion, was relatively easier to bring about. 
+
+Why? In most cases, when people turn their lights on or plug electric devices to the charging station, they don't really have to consciously choose the energy source. Due to (natural monopoly)[https://cs.stanford.edu/people/eroberts/cs201/projects/corporate-monopolies/benefits_natural.html#:~:text=Natural%20Monopolies,example%20of%20a%20natural%20monopoly.&text=Having%20two%20electric%20companies%20split,a%20near%20doubling%20of%20price.], consumers don't even have any option to choose from in many countries. That's why most renewable energy campaigns target policy-makers to put regulations in place or push utility companies to shut down coal powerplants. However, when it comes to transportation or agriculture, change is possible only by changing people's consumption choices when purchasing a car or food. How do you convince 7 billion people to buy electric cars or eat vegan, without losing respect for their freedom to choose and other economic circumstances that make it difficult to buy "green"? 
+
+But. (This blog)[https://energyathaas.wordpress.com/2021/01/11/a-tale-of-two-sectors/] from the Energy at Haas convinced me that it is time to tackle other sectors despite all the difficulties of creating change in non-energy sectors. The author, Catherine Wolfram, argues that the progress on carbon emissions reduction in the transportation sector is much more sluggish than the electricity sector in major economies (UK, California, Texas). 
+
+## Analysis of historical emissions data from Climate Watch 
+
+I recreated the chart for other major economies to extend her analysis to the global level and other countries. I used the same dataset that Catherine used: (Climate Watch Historical Country Greenhouse Gas Emissions Data (1990-2017))[https://www.climatewatchdata.org/data-explorer/historical-emissions?historical-emissions-data-sources=cait&historical-emissions-gases=all-ghg&historical-emissions-regions=All%20Selected&historical-emissions-sectors=total-including-lucf&page=1]. The dataset contains sector‐level greenhouse gas (GHG) emissions data at the global level and country-level. 
+
+
+### Data Processing
+
+Sectors in this dataset are categorized into six main sectors (Agriculture, Bunker Fuels, Energy, Industrial Processes, Land-Use Change and Forestry, Waste). The "energy" category is further broken down into six sub-sectors: building, electricity/heat, fugitive emissions, manufacturing/construction, fuel combustion and transportation. We have to consider the data at the sub-sector level to compare the energy and transport sectors.
+
+```{r}
+# Load data and make sure that the data formats are appropriate. Pivot the dataset longer to create "year" column. 
+cait_raw <- read.csv("data/historical_emissions.csv", sep=";", stringsAsFactors=FALSE) %>% clean_names()  
+cait_raw[,6:33] <- as.numeric(as.character(unlist(cait_raw[,6:33])))
+
+colSums(is.na(cait_raw)) # No NAs! 
+
+# Make a subset for sub-sector level values. Filter out the energy category and total values, since the level of granularity is higher. Mark energy sub-sectors with a prefix "Energy". 
+category <- read.csv("data/sector_category.csv", sep=";") 
+energy_sub <- category$subsector_1[category$sector=="Energy"]
+
+cait_subsector <- cait_raw %>% mutate(sector = ifelse(sector %in% energy_sub, paste("Energy:", sector, sep=" "), sector)) %>% filter(!str_detect(sector, "^Total")) %>% filter(sector != "Energy")
+                                                                                     
+```
+
+For the purpose of this analysis, we will consider the relative change in GHG levels compared to 1990s for the year 2000-2017.
+
+```{r}
+# Create a new column for the base level (GHG level for 2000s). 
+# Calculate the relative change in GHG compared to the base value. 
+base <- cait_subsector %>% filter(year==2000) %>% select(country, sector, base = value) 
+cait_ch <- inner_join(cait_subsector,  base, by=c("country", "sector")) %>% mutate(change = round( (value-base)/base*100,2)) %>% filter(year>= 2000)
+```
+
+We will subset the dataset by top 7 emitters in 2017.
+
+```{r}
+cait_top <- cait_raw %>% filter(country!="World" & year==2017) %>% filter(sector=="Total including LUCF") %>% arrange(desc(value)) 
+head(cait_top, 7)
+```
+
+
+### The electricity sector champions CO2 reduction, while the transportation sector lags behind
+
+```{r include=FALSE}
+# Change in world's GHG from electricity/heat vs transport compared to 1990 level (1990-2017)
+entr <- c("Energy: Electricity/Heat", "Energy: Transportation")
+world <- cait_ch %>% filter(country=="World") %>% filter(sector %in% entr)
+ggplot(world, aes(x=year, y=change, color=sector)) + geom_line() 
+
+## Why is there a hugh spike in the year 2010-2015? Error? 
+
+```
+
+
+```{r}
+# Change in world's GHG from electricity/heat vs transport compared to 1990 level (1990-2017)
+```
+
+# What are the main challenges in decarbonizing the energy and transport sector? 
+
+
+
