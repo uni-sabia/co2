@@ -8,3 +8,5 @@ In UK and the US, carbon emissions reduction is making larger progress in the el
 * Which sector has highest co2 emission? 
 * Which sector is making the fastest progress on emissions reduction?
 * How does Europe's carbon emission reduction in the electricity sector compare to the transport sector?
+
+This project has been published on my blog: https://conscioustableblog.wordpress.com/2021/01/20/tracking-progress-on-energy-and-transport
