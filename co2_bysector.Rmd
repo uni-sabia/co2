@@ -36,13 +36,11 @@ pre[class] {
 
 # Decarbonizing energy and transport: which one comes first? 
 
-For years, I thought renewable energy was the "silver bullet" to solving the climate crisis. I campaigned for renewable energy for years at all kinds of organizations - Greenpeace, KFEM and small social enterprises promoting renewable energy solutions for developing countries. Renewable energy was my thing. 
+For years, I thought renewable energy was the "silver bullet" to solving the climate crisis. I campaigned for renewable energy for years with several NGOs and social businesses. Renewable energy was my thing. I knew in the back of my head that there was a lot of work to be done in other sectors, too. But the energy world fascinated me so much that I wasn't  looking into other high-carbon sectors like transport.
 
-I knew in the back of my head that there was a lot of work to be done in other sectors, too. But the energy world fascinated me so much that I wasn't  looking into other high-carbon sectors like transport.
+What I loved about the energy sector was that there is a relatively larger role for public policy to play than other sectors. Individual action is still important in creating impact, but enough to move the market. That's because consumers don't even have any option to choose from in many countries. Electricity markets often form [natural monopolies](https://cs.stanford.edu/people/eroberts/cs201/projects/corporate-monopolies/benefits_natural.html#), which is why consumers have limited purchase options. In your house, there is no special "green plug" to buy energy from, right? You get what the utility company puts in the grid. So, the "voting with your money" is not likely to have much influence. Hence, most energy campaigns target governments to regulate and enforce stricter rules, rather than targeting individuals to act. 
 
-What I loved about the energy sector was that there is a relatively larger role for public policy to play than other sectors. Individual action is still important in creating impact, but it has a limited impact on the market. That's because consumers don't even have any option to choose from in many countries. Electricity markets often form ([natural monopolies](https://cs.stanford.edu/people/eroberts/cs201/projects/corporate-monopolies/benefits_natural.html#)), which is why consumers have limited purchase options. In our houses, there is no special "green plug" to buy from, right? So, the "voting with your money" strategy may be a bit ineffective. Hence, most energy campaigns target governments to regulate and enforce stricter rules, rather than targeting individuals to act. 
-
-In contrast, in other sectors like transportation or agriculture, people have to make conscious choices every day: _should I buy an electric or diesel car? Should I buy organic or conventional?_ Because every dollar that people spend sends clear signals to the market, there is a big role for individuals to play to create social change. Personally, I find campaigning for social change in these sectors is difficult because I don't feel that I have the right or authority to tell people what to do. Nor do I want to morally judge others' consumption or lifestyle choices because there may be justifiable reasons that I am not aware of - not having enough money, for example. This moral dilemma drew me into the energy sector, where I felt more comfortable asking for change. 
+In contrast, in other sectors like transportation or agriculture, people have to make conscious choices every day: _should I buy an electric or diesel car? Should I buy organic or conventional?_ Because every dollar that people spend sends clear signals to the market, there is a big role for individuals to play to create social change. Personally, I find these sectors difficult to campaign in because I don't feel that I have the right or authority to tell people what to do. Nor do I want to morally judge others' consumption or lifestyle choices because there may be justifiable reasons that I am not aware of - not having enough money, for example. This moral dilemma drew me into the energy sector, where I felt more comfortable asking for change. 
 
 But. [This blog](https://energyathaas.wordpress.com/2021/01/11/a-tale-of-two-sectors/) from Energy at Haas convinced me that it is indeed about time to change the transport sector. The author, Catherine Wolfram, argues that the progress on carbon emissions reduction in the transportation sector is much slower than the electricity sector in the UK, California and Texas. 
 
@@ -110,7 +108,7 @@ top5 <- paste(cait_top$country[1:5], sep=",", collapse=", ")
 
 Catherine's hypothesis holds true for the top 5 emitters: `r top5`. The graph below shows that the GHG emissions in the electricity/heat sector is slowly but surely down faster than in the transport sector. 
 
-Renewable energy played a big role in reducing GHG emissions in the electricity sector, whose prices are falling like a landslide globally. China and India are pushing renewables hard, increasing the share of RE in the energy mix by 33% and 17% per year ([Golden, 2020](https://energy.stanford.edu/news/renewable-energy-growth-china-and-india-underappreciated-no-vaccine-climate-crisis)). The UK is close to [phasing out of coal](https://conscioustableblog.wordpress.com/2021/01/05/coal-free-britain-how-did-they-get-there-and-what-comes-next/) and many other European countries have plans to follow suit. In the US, renewables are increasing faster than any other source ([C2ES](https://www.c2es.org/content/renewable-energy/#:~:text=Renewable%20energy%20is%20the%20fastest,wind%20power%20(6.6%20percent))). 
+Renewable energy played a big role in reducing GHG emissions in the electricity sector, whose prices are falling like a landslide globally. China and India are pushing renewables hard, increasing the share of RE in the energy mix by 33% and 17% per year, respectively ([Golden, 2020](https://energy.stanford.edu/news/renewable-energy-growth-china-and-india-underappreciated-no-vaccine-climate-crisis)). The UK is close to [phasing out of coal](https://conscioustableblog.wordpress.com/2021/01/05/coal-free-britain-how-did-they-get-there-and-what-comes-next/) and many other European countries have plans to follow suit. In the US, renewables are increasing faster than any other source ([C2ES](https://www.c2es.org/content/renewable-energy/#:~:text=Renewable%20energy%20is%20the%20fastest,wind%20power%20(6.6%20percent))). 
 
 
 ```{r class.output="scroll-100"}
@@ -148,11 +146,11 @@ world_oecd <- rbind(world, oecd_ch) %>% filter(sector %in% entr) %>% mutate(coun
 ```
 
 
-### It's time for Asian countries to rise up! 
+### Asian countries' gotta meet the sunshine! 
 
 By region, GHG emissions are increasing fastest in East Asia and South Asia. This is most likely due to the rapid economic growth of emerging markets and large population. 
 
-However, Asian countries no longer have an excuse to opt-out of the global decarbonization effort. Given the falling price of renewables, policy-driven effort to integrate more renewables in the grid is good for the economy in the long run.  Besides, the climate crisis can be solved only if EVERYONE acts! Fast! 
+However, Asian countries no longer have an excuse to opt-out of the global decarbonization effort. Given the falling price of renewables, policy-driven effort to integrate more renewables in the grid is good for the economy in the long run.  Besides, the climate crisis can be solved only if EVERYONE acts. Fast! 
 
 ```{r class.output="scroll-100"}
 region_data <- region_ch %>% filter(sector %in% entr)
@@ -168,9 +166,9 @@ ggplot(region_data, aes(x=year, y=change, color=sector)) + geom_line() +
 
 # Time to start decarbonizing transports, but renewable energy growth needs to accelerate. 
 
-Great news. The analysis showed that major economies are reducing GHG from the electricity sector! Now it's the transportation's turn. 
+Great news. The analysis showed that major economies are reducing GHG from the electricity sector. Now it's the transportation's turn. 
 
-Consumers can accelerate this transition by taking more public transportation, walking, cycling and purchasing electric cars. Governments can help by building adequate infrastructures such as public transportation and EV charging stations. 
+Governments can start the transition by impose carbon tax on carbon-intensive transport, building adequate infrastructures such as public transportation and EV charging stations. Consumers can accelerate this transition by taking more public transportation, walking, cycling and purchasing electric cars. 
 
 Countries cannot stop the effort to increase renewable energy production. The electricity demand will grow exponentially as the transport sector electrifies. This increase in demand should also be met with renewables.
 
