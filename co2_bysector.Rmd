@@ -162,6 +162,16 @@ ggplot(region_data, aes(x=year, y=change, color=sector)) + geom_line() +
   title = element_text(size=8)) +
   labs(title = "Change in GHG compared to 2000 level", x="Year", y="%") + scale_color_manual(values = c("#20639B", "#ED553B"))
 
+world <- world %>% filter(sector %in% entr)
+ggplot(world, aes(x=year, y=change, color=sector)) + geom_line() + theme_stata() + 
+  theme(legend.position="bottom", legend.title=element_blank(),
+  legend.text = element_text(size = 8), axis.text=element_text(size=8),
+  strip.text.x = element_text(size = 9), 
+  title = element_text(size=8)) +
+  labs(title = "Change in GHG compared to 2000 level, World", x="Year", y="%") + scale_color_manual(values = c("#20639B", "#ED553B"))
+
+ggsave("images/feature.png", width=5, height=3)
+
 ```
 
 # Time to start decarbonizing transports, but renewable energy growth needs to accelerate. 
