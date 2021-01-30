@@ -1,0 +1,241 @@
+---
+title: 'Decarbonizing electricity and transport: which one comes first?'
+author: "Uni Lee"
+date: "1/20/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(janitor)
+library(data.table)
+library(ggthemes)
+library(gt)
+```
+
+```{css, echo=FALSE}
+pre {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+pre[class] {
+  max-height: 100px;
+}
+
+.scroll-100 {
+  max-height: 100px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+[Catherine Wolfgang at Energy at Haas recently published a blog that analyzes sector-level greenhouse gas emissions (GHG) data to compare the progress in decarbonization of the energy and transport sector](https://energyathaas.wordpress.com/2021/01/11/a-tale-of-two-sectors/). Catherine's analysis demonstrates that Britain, Texas, and California have made significant progress in reducing GHG in the electricity sector, that of the transportation sector is still rising. Catherine's analysis inspired me to extend her analysis to the global, regional, and country level (limited to the top 5 emitters). In this blog, I will walk you through the steps I took in R to extend her analysis.
+
+## Exploring historical emissions data from Climate Watch (2000-2017)
+
+While Catherine sourced data from various sources, I focused on Climate Watch Historical Country Greenhouse Gas Emissions Data (1990-2017). The dataset contains sectoral greenhouse gas (GHG) emissions data at the global and national levels.
+
+
+### Data Processing
+
+Sectors in this dataset are categorized into six main sectors (Agriculture, Bunker Fuels, Energy, Industrial Processes, Land-Use Change and Forestry, Waste). The "energy" category is further broken down into six sub-sectors: building, electricity/heat, fugitive emissions, manufacturing/construction, fuel combustion and transportation. So, I had to take out the value for the energy category to prevent double-counting. 
+
+```{r class.output="scroll-100"}
+# Load data and make sure that the data formats are appropriate. Pivot the dataset longer to create "year" column. 
+cait_raw <- read.csv("data/historical_emissions.csv", sep=";", stringsAsFactors=FALSE) %>% clean_names()
+cait_raw[] <- lapply(cait_raw, function(x) gsub("N/A", NA, x))
+cait_raw[,6:33] <- as.numeric(unlist(cait_raw[,6:33]))
+cait_raw <- cait_raw %>% pivot_longer(cols=starts_with("x"), names_to="year", values_to="value", names_prefix="x") %>% mutate(year=as.numeric(year))
+
+# Make a subset for sub-sector level values. Filter out the energy category and total values, since the level of granularity is higher. Mark energy sub-sectors with a prefix "Energy". 
+category <- read.csv("data/sector_category.csv", sep=";") 
+energy_sub <- category$subsector_1[category$sector=="Energy"]
+
+cait_subsector <- cait_raw %>% mutate(sector = ifelse(sector %in% energy_sub, paste("Energy:", sector, sep=" "), sector)) %>% filter(!str_detect(sector, "^Total")) %>% filter(sector != "Energy") %>% na.omit()
+
+head(cait_subsector %>% filter(year==2017) %>% select(country, sector, year, value, unit)) 
+```
+
+For this analysis, I will consider the relative change in GHG levels compared to 1990 during 2000-2017.
+
+```{r class.output="scroll-100"}
+# Create a new column for the base level (GHG level in 2000). # Calculate the relative change in GHG compared to the base value. 
+ 
+base <- cait_subsector %>% filter(year==2000) %>% select(country, sector, base = value) %>% na.omit()
+cait_ch <- inner_join(cait_subsector,  base, by=c("country", "sector")) %>% mutate(change = round((value-base)/base*100,2)) %>% filter(year>= 2000)
+
+head(cait_ch %>% filter(year==2017) %>% select(country, sector, year, value, change)) 
+
+```
+
+For regional-level analysis, calculated the change in total GHG since 2000 by region and OECD membership. Since the original dataset does not contain country meta data, I sourced another dataset provided by [World Integrated Trade Solution](https://wits.worldbank.org/CountryProfile/Metadata/en/Country/All).
+
+```{r warning=FALSE, message=FALSE, class.output="scroll-100"}
+# Add country metadata
+meta <- read.csv("data/WITSCountryProfile.csv", sep=",") %>% clean_names() %>% mutate(OECD = ifelse(other_groups=="OECD", T, F)) %>% select(country=country_name, region, OECD) 
+cait_meta <- left_join(cait_ch, meta, by="country") %>% filter(region!=is.na(region)) %>% filter(region!="") %>% select(-base, -change)
+
+head(cait_meta %>% filter(year==2017) %>% select(country, region, OECD, sector, value, year))
+```
+
+```{r}
+# Calculate the total GHG and their change since 2000 by region
+region <- cait_meta %>% group_by(region, sector, year) %>% summarise(value=sum(value, rm.na=T)) 
+base_reg <-  region %>% filter(year==2000) %>% select(region, sector, base = value) 
+region_ch <- inner_join(region,  base_reg, by=c("region", "sector")) %>% mutate(change = round((value-base)/base*100,2)) %>% filter(year>= 2000)
+
+head(region_ch %>% filter(year==2017) %>% select(region, sector, value, change, year))
+
+```
+
+```{r}
+# Calculate the total GHG and their change in 2000 by OECD membership
+oecd <- cait_meta %>% group_by(OECD, sector, year) %>% summarise(value=sum(value, rm.na=T)) 
+base_oecd <- oecd %>% filter(year==2000) %>% select(OECD, sector, base = value) 
+oecd_ch <- inner_join(oecd,  base_oecd, by=c("OECD", "sector")) %>% mutate(change = round((value-base)/base*100,2)) %>% filter(year>= 2000) %>% mutate(country=ifelse(OECD==TRUE, "OECD", "non-OECD")) %>% ungroup() %>% select(-OECD)
+
+head(oecd_ch %>% filter(year==2017) %>% select(country, sector, value, change, year))
+```
+
+## Analysis of GHG from electricity and transport sectors
+
+### Electricity and transport account for almost 50% of global GHG emisisons 
+
+Yes, that's right. The electricity and transport take up a HUGE chunk (50%!) of global GHG emissions. That's why they must be priortized in decarbonization efforts, although other sectors are important, too.  
+
+The following code produces a table that summarizes sector breakdown of world's GHG emissions in 2017. I made in into a function so that you can reproduce the table for other countries easily.
+
+```{r}
+## Parameters
+select_country <- "World" #Choose which country you want to summarize
+select_year <- 2017 # Choose which year you want to focus on
+
+# 1. Subset data
+summary_table <- function(select_country, select_year) {
+
+country <- cait_meta %>% filter(country==select_country, year==select_year) 
+
+# Calculate shares per sector
+country_summary_sector <- country %>% group_by(sector) %>%
+  summarize(sector_total = round(sum(value),0)) %>% 
+  mutate(share=sector_total/sum(sector_total)) %>%
+  mutate(category = ifelse(sector %in% energy_sub, "Energy", sector)) %>%
+  mutate(sector = ifelse(sector %in% energy_sub, sector, "-")) %>%
+  arrange(desc(share), .by_group=TRUE)
+
+
+# Create a gt table
+
+country_summary <- country_summary_sector %>%
+  dplyr::group_by(category) %>% 
+  gt(rowname_col="sector", groupname_col="category") %>%
+  tab_header(
+    title=md(paste("Sector breakdown of ", select_country,"'s", " GHG in ",select_year))
+  ) %>%
+  tab_source_note(md("Data source: Climate Watch Data Explorer")) %>%
+  cols_align(align="center", columns=vars(sector_total, share)) %>%
+  cols_label(sector_total = "GHG in MtCO₂e", share="Share") %>%
+  fmt_number(columns=vars(sector_total), sep_mark=",", decimals=0) %>%
+  fmt_percent(columns=vars(share), decimals=1)
+
+country_summary
+
+}
+
+summary_table("World", 2017)
+```
+
+
+### Top 6 emitters are reducing GHG in the electricity sector, but not so much for transportation.
+
+```{r include=FALSE}
+# Take the names of top 5 emitting countries
+cait_top <- cait_raw %>% filter(country!="World" & year==2017) %>% filter(sector=="Total including LUCF") %>% arrange(desc(value)) 
+top5 <- paste(cait_top$country[1:5], sep=",", collapse=", ")
+
+```
+
+Catherine's hypothesis holds true for the top 5 emitters: `r top5`. The graph below shows that the GHG emissions in the electricity/heat sector is slowly but surely down faster than in the transport sector. 
+
+Renewable energy played a big role in reducing GHG emissions in the electricity sector, whose prices are falling like a landslide globally. China and India are pushing renewables hard, increasing the share of RE in the energy mix by 33% and 17% per year, respectively ([Golden, 2020](https://energy.stanford.edu/news/renewable-energy-growth-china-and-india-underappreciated-no-vaccine-climate-crisis)). The UK is close to [phasing out of coal](https://conscioustableblog.wordpress.com/2021/01/05/coal-free-britain-how-did-they-get-there-and-what-comes-next/) and many other European countries have plans to follow suit. In the US, renewables are increasing faster than any other source ([C2ES](https://www.c2es.org/content/renewable-energy/#:~:text=Renewable%20energy%20is%20the%20fastest,wind%20power%20(6.6%20percent))). 
+
+
+```{r class.output="scroll-100"}
+# Change in GHG in top 5 emitting countries, 2000-201
+entr <- c("Energy: Electricity/Heat", "Energy: Transportation")
+top5_entr <- cait_ch %>% filter(country %in% cait_top$country[1:5]) %>% filter(sector %in% entr) %>% mutate(country=factor(country, levels=unique(country))) # This is for creating order in the visualization.
+
+ggplot(top5_entr, aes(x=year, y=change, color=sector)) + geom_line() +
+  facet_wrap(~country) + theme_stata() + theme(legend.position="bottom", legend.title=element_blank(),
+  legend.text = element_text(size = 8),  
+  title = element_text(size=8)) +
+  labs(title = "Change in GHG compared to 2000 level", x="Year", y="%") + scale_color_manual(values = c("#20639B", "#ED553B"))
+
+```
+
+### The world still needs more renewables
+
+At the global level, GHG emissions from electricity are still rising faster than the transport sector, especially in non-OECD countries.
+
+Advanced economies have more fiscal and regulatory capacity to push the economy toward decarbonization. For less developed countries, a low-carbon economy sounds more like a luxury. Private investment can't be scaled up in low-carbon technologies, since the interest rates are high and investment risks are higher. 
+
+This trend speaks for the need for more green official development aids (ODA), especially in the context of COVID-19 response. Other options such as [debt-for-climate swaps](https://www.iisd.org/sustainable-recovery/news/using-debt-swaps-to-tackle-debt-climate-and-nature-loss/#:~:text=According%20to%20the%20paper%2C%20debt,reducing%20climate%20resilience%2C%20climate%20emissions) are also under active discussion. 
+
+```{r class.output="scroll-100"}
+# Change in GHG from electricity/heat vs transport compared to 1990 level (1990-2017) - Global vs. OECD vs. non-OECD
+
+world <- cait_ch %>% filter(country=="World") %>% select(sector, year, value, base, change, country)
+world_oecd <- rbind(world, oecd_ch) %>% filter(sector %in% entr) %>% mutate(country=factor(country, levels=c("World", "OECD", "non-OECD")))
+
+ ggplot(world_oecd, aes(x=year, y=change, color=sector)) + geom_line() +
+  facet_wrap(~country) + theme_stata() + theme(  title = element_text(size=8), legend.position="bottom", legend.title=element_blank(),
+  legend.text = element_text(size = 8)) +
+  labs(title = "Change in GHG compared to 2000 level", x="Year", y="%") + scale_color_manual(values = c("#20639B", "#ED553B"))
+
+```
+
+
+### Asian countries' gotta meet the sunshine! 
+
+By region, GHG emissions are increasing fastest in East Asia and South Asia. This is most likely due to the rapid economic growth of emerging markets and large population. 
+
+However, Asian countries no longer have an excuse to opt-out of the global decarbonization effort. Given the falling price of renewables, policy-driven effort to integrate more renewables in the grid is good for the economy in the long run.  Besides, the climate crisis can be solved only if EVERYONE acts. Fast! 
+
+```{r class.output="scroll-100"}
+region_data <- region_ch %>% filter(sector %in% entr)
+ggplot(region_data, aes(x=year, y=change, color=sector)) + geom_line() +
+  facet_wrap(~region, ncol = 2) + theme_stata() + 
+  theme(legend.position="bottom", legend.title=element_blank(),
+  legend.text = element_text(size = 8), axis.text=element_text(size=8),
+  strip.text.x = element_text(size = 9), 
+  title = element_text(size=8)) +
+  labs(title = "Change in GHG compared to 2000 level", x="Year", y="%") + scale_color_manual(values = c("#20639B", "#ED553B"))
+
+world <- world %>% filter(sector %in% entr)
+ggplot(world, aes(x=year, y=change, color=sector)) + geom_line() + theme_stata() + 
+  theme(legend.position="bottom", legend.title=element_blank(),
+  legend.text = element_text(size = 8), axis.text=element_text(size=8),
+  strip.text.x = element_text(size = 9), 
+  title = element_text(size=8)) +
+  labs(title = "Change in GHG compared to 2000 level, World", x="Year", y="%") + scale_color_manual(values = c("#20639B", "#ED553B"))
+
+ggsave("images/feature.png", width=5, height=3)
+
+```
+
+# Time to start decarbonizing transports, but renewable energy growth needs to accelerate. 
+
+Great news. The analysis showed that major economies are reducing GHG from the electricity sector. Now it's the transportation's turn. 
+
+Governments can start the transition by impose carbon tax on carbon-intensive transport, building adequate infrastructures such as public transportation and EV charging stations. Consumers can accelerate this transition by taking more public transportation, walking, cycling and purchasing electric cars. 
+
+Countries cannot stop the effort to increase renewable energy production. The electricity demand will grow exponentially as the transport sector electrifies. This increase in demand should also be met with renewables.
+
+The regional analysis showed that Emissions from the rapidly emerging markets in Asia are growing the fastest. This emphasizes the need for developing decarbonization strategies for China, India and Asian Tigers. 
+
