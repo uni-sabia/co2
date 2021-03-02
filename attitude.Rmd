@@ -1,0 +1,129 @@
+---
+title: "Analysis of people's attitude toward climate change in Germany"
+author: "Uni Lee"
+date: "3/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(haven)
+library(dplyr)
+library(tidyverse)
+library(labelled)
+library(gt)
+```
+
+# Do younger generations care more about climate change in Germany?
+
+Not event COVID-19 could turn down the voices of [Fridays for Future](https://fridaysforfuture.org/), a global climate strike movement sparked by Greta Thunberg in 2018. The driving force of this global movement is [Generation Z](https://en.wikipedia.org/wiki/Generation_Z), characterized as the generation born in the late 1990s to the early 2010s that has had the highest exposure to internet technology and social media during childhood. Using their digital bond as an advantage, the FFF activists kept the momentum of climate strikes by quickly adopting online alternatives. Through persistent global engagement in climate strikes, youth activists of Fridays for Future have successfully brought the climate agenda as one of the main policy agenda of our times. 
+
+Is the Gen Z alone in this fight against climate change? Or is there an inter-generational support for global climate action? Which age group cares the most about climate?  In this blog, we analyze the [2016 European Social Survey](https://www.europeansocialsurvey.org/download.html?file=ESS8e02_2&c=&y=2016&loggedin) data to explore generational differences in attitudes toward climate change.
+
+# Data
+
+European Social Survey is a bi-annual cross-national survey that measures the attitudes, beliefs and behavior patterns of diverse populations. In the 2016 round, the researchers included questionnaires related to climate change.  
+
+```{r}
+# Load data
+ess_raw <- read_dta("data/ESS8e02_2.dta", encoding='latin1')
+length(ess_raw)
+```
+
+This dataset has 535 variables because of the wide range of topics covered in ESS. Finding the right variables to work with can be tricky when dealing with so many variables. But don't lose hope! The following custom function will make our variable-searching a little easier.
+
+```{r}
+# Check list of variables 
+# Make list of variables
+makeVlist <- function(x) {
+  labels <- sapply(x, function(x) attr(x,"label"))
+  tibble(name= names(labels), label=labels)
+}
+variables <- makeVlist(ess_raw)
+```
+
+Variables that are relevant to this analysis are:
+
+- idno, cntry, yrbrn : Subject ID, country, birth year and gender
+- wrclmch : How worried are you about climate change? (1-5) 
+- ccrdprs : To what extent do you feel personal responsibility to reduce climate change? (1-10)
+- inctxff : Do you favor increasing taxes on fossil fuels? (1-5)
+- sbsrnen : Do you favor subsidies for renewable energy? (1-5)
+
+```{r}
+# Select variables
+ess <- ess_raw %>% select(idno, cntry, # unique keys and country
+                          yrbrn, gndr, # respondent's age and gender
+                          rdcenr, # How often do things to reduce energy use
+                          wrclmch, # How worried about climate change
+                          ccrdprs, # To what extent feel personal responsibility to reduce climate change
+                          inctxff, # Favour increase taxes on fossil fuels 
+                          sbsrnen,# Favour subsidise renewable energy
+                          ) %>% remove_labels()
+```
+
+Since our population of interest is Germany, we will narrow the sample dataset to Germany. Then, we will group subjects into four generations: Generation Z, (1997-2012), Millenials (1981-1996), Gen X (1965-1980), and Baby Boomers (1940 and earlier). Eliminating missing values in the dataset brings the final sample size to 2,411. 
+
+```{r}
+ess_de <- ess %>% filter(cntry=="DE") %>% mutate(generation = case_when(
+    yrbrn >= 1997 & yrbrn <=2012 ~ "Gen Z",
+    yrbrn >= 1981 & yrbrn <= 1996 ~ "Millennials",
+    yrbrn >= 1965 & yrbrn <= 1980 ~ "Gen X",
+    yrbrn >= 1946 ~ "Baby Boomers",
+    TRUE ~ "NA"
+  )) %>% mutate(
+    generation = factor(generation, levels=c("Gen Z", "Millennials", "Gen X", "Baby Boomers"))
+  ) %>%  filter(generation != "NA") %>% na.omit() 
+```
+
+# Analysis 
+
+## Which generation is the most worried about climate change? 
+
+The following code generates kernel density plots, which shows general distribution of scores for the level of worries about climate change.
+
+Contrary to my assumption ("Gen Z is the most concerned about climate change than any other generation), the graph shows that higher percentage of people in the baby boomer group (69 or older at the time of interview) say that they are "very" or "extremely" worried about climate change.
+
+```{r}
+# Kernal density plots
+ggplot(ess_de, aes(x=wrclmch, fill=generation, color=generation))  + 
+  geom_density(stat="density", alpha=0.2, size=0.2) + 
+  labs(title="How worried are you about climate change?",
+       x="1=Not at all worried, 5=Extremely worried",
+       y="Density") +
+  xlim(0,5) + theme_classic() +
+  theme(plot.title=element_text(hjust=0.5),
+        legend.title = element_blank()) +
+  scale_color_manual(values=c("red", "aquamarine", "blue", "green4")) + 
+  scale_fill_manual(values=c("red", "aquamarine", "blue", "green4")) 
+```
+
+More specifically, x% of people
+
+```{r}
+# Frequency distribution table
+freq <- ess_de %>% group_by(generation, wrclmch) %>% summarise(Freq=n()) %>% mutate(share=round(Freq/sum(Freq)*100,0)) %>% as.data.frame() %>% arrange(desc(wrclmch))
+
+genz <- freq %>% filter(generation=="Gen Z") %>% select(genz=share)
+mil <- freq %>% filter(generation=="Millennials") %>% select(mil=share)
+genx <- freq %>% filter(generation=="Gen X") %>% select(genx=share)
+boomer <- freq %>% filter(generation=="Baby Boomers") %>% select(boomer=share)
+score <- factor(c("Extremely worried", "Very worried", "Somewhat worried", "Not very worried", "Not at all worried"))
+
+freq_table <- tibble(score, genz, mil, genx, boomer)
+
+# Make the table look pretty
+gt(freq_table) %>% 
+  tab_header(
+    title= "Frequncy distribution of scores by generation"
+  ) %>% 
+  cols_label(score="How worried?", genz="Gen Z (%)", mil="Millenials (%)", genx="Gen X (%)", boomer="Baby Boomers (%)") %>%
+  cols_align("center")
+
+```
+
+Taking sample statistics may help us get a more accurate sense of data. 
+
+
+
+Reading list: https://climatecommunication.yale.edu/publications/do-younger-generations-care-more-about-global-warming/

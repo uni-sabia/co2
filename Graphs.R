@@ -1,3 +1,6 @@
+if(!require(devtools)) install.packages("devtools")
+devtools::install_github("cardiomoon/moonBook")
+devtools::install_github("cardiomoon/webr")
 library(dplyr)
 library(tidyverse)
 library(ggplot2)
@@ -5,7 +8,8 @@ library(janitor)
 library(data.table)
 library(ggthemes)
 library(gt)
-
+library(moonBook)
+library(webr)
 ###
 #This time, we will create a summary table that shows 
 # the share of sector-by-sector GHG for the world and Germany in 2017.
@@ -77,71 +81,9 @@ country_summary
 
 summary_table("United States", 2017)
 
-#### Germany's GHG in 2017 by sector. 
-# 1. Subset data
-germany <- cait_meta %>% filter(country=="Germany", year==2017) 
-
-# Calculate shares per sector
-germany_summary_sector <- germany %>% group_by(sector) %>%
-  summarize(sector_total = round(sum(value),0)) %>% 
-  mutate(share=sector_total/sum(sector_total)) %>%
-  mutate(category = ifelse(sector %in% energy_sub, "Energy", sector)) %>%
-  mutate(sector = ifelse(sector %in% energy_sub, sector, "-")) %>%
-  arrange(desc(share), .by_group=TRUE)
+#### Create a Pie donut chart
 
 
-# Create a gt table
-
-germany_summary <- germany_summary_sector %>%
-  dplyr::group_by(category) %>% 
-  gt(rowname_col="sector", groupname_col="category") %>%
-  tab_header(
-    title=md("Sector breakdown of Germany's GHG in 2017")
-  ) %>%
-  tab_source_note(md("Data source: Climate Watch Data Explorer")) %>%
-  cols_align(align="center", columns=vars(sector_total, share)) %>%
-  cols_label(sector_total = "GHG in MtCO₂e", share="Share") %>%
-  fmt_number(columns=vars(sector_total), sep_mark=",", decimals=0) %>%
-  fmt_percent(columns=vars(share), decimals=1)
-
-gtsave(germany_summary, "images/germany_summary.png")
-
-# Step 1. Make a basic circular barplot
-
-world_circle <- ggplot(world_summary_bigsector, aes(x=as.factor(big_sector), y=share)) +
-  geom_bar(stat="identity") + 
-  ylim(-3, max(world_summary_bigsector$share)) +
-  theme_minimal() +
-  theme(
-    axis.text=element_blank(),
-    axis.title = element_blank(),
-    panel.grid=element_blank(),
-    plot.margin = unit(rep(-2,4), "cm")) +
-  coord_polar(start=0) 
-
-world_circle 
-# Step 2. Add labels
-## Prepare a dataframe for labels
-label_world <- world %>% mutate(id = row_number())
-
-## Calculate the angle of labels
-number_of_bar <- nrow(label_world)
-angle <- 90-360*(label_world$id-0.5)/number_of_bar
-
-## Calculate the alignment of labels: right or left
-label_world$hjust <- ifelse(angle < -90, 1, 0)
-
-## Flip angle to make them readable
-label_world$angle <- ifelse(angle < -90, angle+180, angle)
-
-## Add the labels using the label dataframe.
-world_circle_2 <- world_circle + 
-  geom_text(data=label_world, aes(x=id, y=value+1000, 
-                                  label=sector, hjust=hjust),
-                                  color="black", fontface="bold", alpha=0.6, size=2.5, 
-                                  angle=label_world$angle, inherit_aes=FALSE)
-
-world_circle_2
 
 #### Regional-level Analysis ####
 # Calculate the total GHG and their change since 2000 by region
