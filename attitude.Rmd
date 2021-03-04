@@ -12,13 +12,16 @@ library(dplyr)
 library(tidyverse)
 library(labelled)
 library(gt)
+library(corrplot)
 ```
 
 # Do younger generations care more about climate change in Germany?
 
-Not event COVID-19 could turn down the voices of [Fridays for Future](https://fridaysforfuture.org/), a global climate strike movement sparked by Greta Thunberg in 2018. The driving force of this global movement is [Generation Z](https://en.wikipedia.org/wiki/Generation_Z), characterized as the generation born in the late 1990s to the early 2010s that has had the highest exposure to internet technology and social media during childhood. Using their digital bond as an advantage, the FFF activists kept the momentum of climate strikes by quickly adopting online alternatives. Through persistent global engagement in climate strikes, youth activists of Fridays for Future have successfully brought the climate agenda as one of the main policy agenda of our times. 
+Not event COVID-19 could turn down the voices of [Fridays for Future (FFF)](https://fridaysforfuture.org/), a global climate strike movement sparked by Greta Thunberg in 2018. They sparked the largest climate movements worldwide, mobilizing millions of people to demand action from political leaders. As of March 2021, [22,193 events in 210 countries/dependent areas](https://fridaysforfuture.org/what-we-do/strike-statistics/list-of-countries/)] have taken place. 
 
-Is the Gen Z alone in this fight against climate change? Or is there an inter-generational support for global climate action? Which age group cares the most about climate?  In this blog, we analyze the [2016 European Social Survey](https://www.europeansocialsurvey.org/download.html?file=ESS8e02_2&c=&y=2016&loggedin) data to explore generational differences in attitudes toward climate change.
+The driving force of this global movement is [Generation Z](https://en.wikipedia.org/wiki/Generation_Z), characterized as the generation born in the late 1990s to the early 2010s. Using their digital aptitude as an advantage, the FFF activists managed to kept momentum of climate strikes up by quickly adopting online strategies. Through persistent global engagement in climate strikes, they have successfully brought the climate agenda as one of the main policy agenda of our times. 
+
+Generation Z cannot afford to alone in this fight. Support from older generations is needed to bring about meaningful change in policy because they outweigh Gen Z in terms of voting power and political influence. How much intergenational support does climate issues have? In this blog, we analyze the [2016 European Social Survey](https://www.europeansocialsurvey.org/download.html?file=ESS8e02_2&c=&y=2016&loggedin) data to explore generational differences in attitudes toward climate change. We will focus our analysis on Germany.
 
 # Data
 
@@ -30,7 +33,7 @@ ess_raw <- read_dta("data/ESS8e02_2.dta", encoding='latin1')
 length(ess_raw)
 ```
 
-This dataset has 535 variables because of the wide range of topics covered in ESS. Finding the right variables to work with can be tricky when dealing with so many variables. But don't lose hope! The following custom function will make our variable-searching a little easier.
+This dataset has 535 variables because of the wide range of topics covered in ESS. Finding the right variables to work with can be tricky when dealing with so many variables. But don't dispair! The following custom function will make our variable-searching a little easier.
 
 ```{r}
 # Check list of variables 
@@ -46,15 +49,15 @@ Variables that are relevant to this analysis are:
 
 - idno, cntry, yrbrn : Subject ID, country, birth year and gender
 - wrclmch : How worried are you about climate change? (1-5) 
-- ccrdprs : To what extent do you feel personal responsibility to reduce climate change? (1-10)
+- ccrdprs : To what extent do you feel personally responsibile for reducing climate change? (1-10) 
 - inctxff : Do you favor increasing taxes on fossil fuels? (1-5)
 - sbsrnen : Do you favor subsidies for renewable energy? (1-5)
+
 
 ```{r}
 # Select variables
 ess <- ess_raw %>% select(idno, cntry, # unique keys and country
-                          yrbrn, gndr, # respondent's age and gender
-                          rdcenr, # How often do things to reduce energy use
+                          yrbrn, # respondent's birth year and gender
                           wrclmch, # How worried about climate change
                           ccrdprs, # To what extent feel personal responsibility to reduce climate change
                           inctxff, # Favour increase taxes on fossil fuels 
@@ -76,16 +79,17 @@ ess_de <- ess %>% filter(cntry=="DE") %>% mutate(generation = case_when(
   ) %>%  filter(generation != "NA") %>% na.omit() 
 ```
 
-# Analysis 
+# Analysis
 
-## Which generation is the most worried about climate change? 
+## Which generation is most worried about climate change? 
 
-The following code generates kernel density plots, which shows general distribution of scores for the level of worries about climate change.
+Contrary to my assumption ("Gen Z is the most concerned about climate change than any other generation), the exploratory analysis showed that Baby Boomers (69 or older at the time of interview) are most worried about climate change. 48% of the Baby Boomers are either _very or extremely worried_ about climate change, whereas about 40-42% of other generations. 
 
-Contrary to my assumption ("Gen Z is the most concerned about climate change than any other generation), the graph shows that higher percentage of people in the baby boomer group (69 or older at the time of interview) say that they are "very" or "extremely" worried about climate change.
+The following code generates a distribution table and a kernel density plot of self-reported scores on the level of worries about climate change.
+
 
 ```{r}
-# Kernal density plots
+# Distribution table and kernel density plots
 ggplot(ess_de, aes(x=wrclmch, fill=generation, color=generation))  + 
   geom_density(stat="density", alpha=0.2, size=0.2) + 
   labs(title="How worried are you about climate change?",
@@ -96,11 +100,7 @@ ggplot(ess_de, aes(x=wrclmch, fill=generation, color=generation))  +
         legend.title = element_blank()) +
   scale_color_manual(values=c("red", "aquamarine", "blue", "green4")) + 
   scale_fill_manual(values=c("red", "aquamarine", "blue", "green4")) 
-```
 
-More specifically, x% of people
-
-```{r}
 # Frequency distribution table
 freq <- ess_de %>% group_by(generation, wrclmch) %>% summarise(Freq=n()) %>% mutate(share=round(Freq/sum(Freq)*100,0)) %>% as.data.frame() %>% arrange(desc(wrclmch))
 
@@ -122,8 +122,90 @@ gt(freq_table) %>%
 
 ```
 
-Taking sample statistics may help us get a more accurate sense of data. 
+## Which generation feels the most personally responsible for climate change? 
+
+About 50% of the population in Germany feel that they are personally responsible for solving climate change, with a median score of 7 out of 10. Although the median score does not vary by generation, the baby boomers feel a little more responsible than other generations.  
+
+The level of personal responsibility people feel is positively correlated with how worried people are about climate change. The box plot below shows that people who are more worried about climate change are likely to feel more personally responsible to solve the problem. 
 
 
+```{r}
+# Summary statistics
+responsibility <- ess_de %>% group_by(generation) %>%
+  summarize(mean=round(mean(ccrdprs),2), median=median(ccrdprs)) 
 
-Reading list: https://climatecommunication.yale.edu/publications/do-younger-generations-care-more-about-global-warming/
+gt(responsibility) %>% tab_header(
+    title= "Level of personal responsibility"
+  ) %>% 
+  cols_label(generation="Generation", mean="Mean", median="Median") %>%
+  cols_align("center")
+
+# Correlation between sense of responsibility and level of worries
+ggplot(ess_de, aes(x=as.factor(wrclmch), y=ccrdprs)) + 
+  geom_boxplot() +
+  labs(x="1: Not at all worried     |     5: Extremely worried",
+       y="Level of personal responsibility") +
+  theme_bw()
+
+```
+
+## Which generation supports climate policies the most?
+
+The ESS researchers also asked respondents whether they support relevant policies such as tax on fossil fuels and providing subsidies to renewable energy providers. Possible answers are: 
+
+- 1	Strongly in favour			
+- 2	Somewhat in favour			
+- 3	Neither in favour nor against			
+- 4	Somewhat against			
+- 5	Strongly against
+
+In the stacked bar charts of the distribution of responses for these two questionnaires, we can observe a slight difference in the support level for different climate policies across generations.
+
+Although Baby Boomers worry the most and personally feel responsible for reducing climate change, they are less likely to support the increase in tax on fossil fuels than the younger generations. 31% of the group are either somewhat or strongly in favor of the policy, whereas about 43-45% of the younger generations are.
+
+Over 80% of each generation supports subsidy schemes for renewable energy. Support for this policy from the Gen Z group is about 10 percentage points higher than the Baby Boomers. 
+
+```{r}
+tax_summary <- ess_de %>% mutate(inctxff=factor(inctxff, levels=c(5,4,3,2,1))) %>% group_by(generation, inctxff) %>%
+  summarize(freq=n()) %>% mutate(share=round(freq/sum(freq)*100,2))
+
+tax <- ggplot(tax_summary, aes(x=inctxff, y=share, fill=inctxff)) + 
+  geom_bar(stat="identity") + 
+  labs(title="Do you support increasing taxes on fossil fuels?",
+       x="5: Strongly against     |     1: Strongly in favour",
+       y="Share (%)") + theme_classic() +
+  theme(plot.title=element_text(hjust=0.5),
+        legend.title = element_blank(),
+        legend.position="none") +
+  scale_fill_manual(values=c("#13091f", "#8c8c8c", "#c9ccc8","#ffee6e", "#ffc94b")) +
+  facet_wrap(~generation) 
+tax
+
+subsidy_summary <- ess_de %>% mutate(sbsrnen=factor(sbsrnen, levels=c(5,4,3,2,1))) %>% group_by(generation, sbsrnen) %>%
+  summarize(freq=n()) %>% mutate(share=round(freq/sum(freq)*100,2))
+
+subsidy <- ggplot(subsidy_summary, aes(x=sbsrnen, y=share, fill=sbsrnen)) + 
+  geom_bar(stat="identity") + 
+  labs(title="Do you support subsidies for renewable energy?",
+       x="5: Strongly against     |     1: Strongly in favour",
+       y="Share (%)") + theme_classic() +
+  theme(plot.title=element_text(hjust=0.5),
+        legend.title = element_blank(), 
+        legend.position="none") +
+  scale_fill_manual(values=c("#13091f", "#8c8c8c", "#c9ccc8","#ffee6e", "#ffc94b")) +
+  facet_wrap(~generation) 
+subsidy
+
+
+```
+
+# You are not alone
+
+In Germany, Gen Z is not alone in the fight against climate change. Our analysis found that there is strong inter-generational support for global climate action. The majority of each generation expresses concerns about climate change, feel personally responsible for the problem, and support relevant climate policies. 
+
+Our analysis challenges the general assumption that the younger generations are more concerned about climate change than the elderly. Baby Boomers were more likely to be worried about climate change by 4-6 percentage points than other generations. A slightly higher percentage of Baby Boomers felt slightly more responsible for solving the problem than others as well. 
+
+
+Increasing tax on fossil fuels and providing subsidies for renewable energy providers are flagship climate policies that are crucial to curb carbon emissions. Contrary to the higher level of worries and personal responsibility, Baby Boomers are less likely to support increasing taxes on fossil fuels, by about 14 percentage points. On the other hand, renewable energy subsidies receive a high level of support (over 80%) across all generations. 
+
+This finding cannot be generalized to other EU countries because Germany is not a representative sample. Germany has the second-highest level of participation in the world, following the US. To draw EU-level insights, we would have to randomly sample subjects from each country, whose sample sizes are weighted by the proportion of the population.
