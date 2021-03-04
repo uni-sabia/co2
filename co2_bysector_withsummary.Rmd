@@ -1,10 +1,10 @@
 ---
-title: "Decarbonizing energy and transport: which one comes first?"
+title: 'Decarbonizing electricity and transport: which one comes first?'
 author: "Uni Lee"
 date: "1/20/2021"
-output: 
-  html_document
-
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -15,6 +15,7 @@ library(ggplot2)
 library(janitor)
 library(data.table)
 library(ggthemes)
+library(gt)
 ```
 
 ```{css, echo=FALSE}
@@ -34,20 +35,11 @@ pre[class] {
 }
 ```
 
-# Decarbonizing energy and transport: which one comes first? 
+[Catherine Wolfgang at Energy at Haas recently published a blog that analyzes sector-level greenhouse gas emissions (GHG) data to compare the progress in decarbonization of the energy and transport sector](https://energyathaas.wordpress.com/2021/01/11/a-tale-of-two-sectors/). Catherine's analysis demonstrates that Britain, Texas, and California have made significant progress in reducing GHG in the electricity sector, that of the transportation sector is still rising. Catherine's analysis inspired me to extend her analysis to the global, regional, and country level (limited to the top 5 emitters). In this blog, I will walk you through the steps I took in R to extend her analysis.
 
-For years, I thought renewable energy was the "silver bullet" to solving the climate crisis. I campaigned for renewable energy for years with several NGOs and social businesses. Renewable energy was my thing. I knew in the back of my head that there was a lot of work to be done in other sectors, too. But the energy world fascinated me so much that I wasn't  looking into other high-carbon sectors like transport.
+## Exploring historical emissions data from Climate Watch (2000-2017)
 
-What I loved about the energy sector was that there is a relatively larger role for public policy to play than other sectors. Individual action is still important in creating impact, but enough to move the market. That's because consumers don't even have any option to choose from in many countries. Electricity markets often form [natural monopolies](https://cs.stanford.edu/people/eroberts/cs201/projects/corporate-monopolies/benefits_natural.html#), which is why consumers have limited purchase options. In your house, there is no special "green plug" to buy energy from, right? You get what the utility company puts in the grid. So, the "voting with your money" is not likely to have much influence. Hence, most energy campaigns target governments to regulate and enforce stricter rules, rather than targeting individuals to act. 
-
-In contrast, in other sectors like transportation or agriculture, people have to make conscious choices every day: _should I buy an electric or diesel car? Should I buy organic or conventional?_ Because every dollar that people spend sends clear signals to the market, there is a big role for individuals to play to create social change. Personally, I find these sectors difficult to campaign in because I don't feel that I have the right or authority to tell people what to do. Nor do I want to morally judge others' consumption or lifestyle choices because there may be justifiable reasons that I am not aware of - not having enough money, for example. This moral dilemma drew me into the energy sector, where I felt more comfortable asking for change. 
-
-But. [This blog](https://energyathaas.wordpress.com/2021/01/11/a-tale-of-two-sectors/) from Energy at Haas convinced me that it is indeed about time to change the transport sector. The author, Catherine Wolfram, argues that the progress on carbon emissions reduction in the transportation sector is much slower than the electricity sector in the UK, California and Texas. 
-
-
-## Analysis of historical emissions data from Climate Watch (2000-2017)
-
-I extended her analysis to the global level and other countries using the same dataset that she used: [Climate Watch Historical Country Greenhouse Gas Emissions Data (1990-2017)](https://www.climatewatchdata.org/data-explorer/historical-emissions?historical-emissions-data-sources=cait&historical-emissions-gases=all-ghg&historical-emissions-regions=All%20Selected&historical-emissions-sectors=total-including-lucf&page=1). The dataset contains sectoral greenhouse gas (GHG) emissions data at the global and national levels. 
+While Catherine sourced data from various sources, I focused on Climate Watch Historical Country Greenhouse Gas Emissions Data (1990-2017). The dataset contains sectoral greenhouse gas (GHG) emissions data at the global and national levels.
 
 
 ### Data Processing
@@ -67,6 +59,7 @@ energy_sub <- category$subsector_1[category$sector=="Energy"]
 
 cait_subsector <- cait_raw %>% mutate(sector = ifelse(sector %in% energy_sub, paste("Energy:", sector, sep=" "), sector)) %>% filter(!str_detect(sector, "^Total")) %>% filter(sector != "Energy") %>% na.omit()
 
+head(cait_subsector %>% filter(year==2017) %>% select(country, sector, year, value, unit)) 
 ```
 
 For this analysis, I will consider the relative change in GHG levels compared to 1990 during 2000-2017.
@@ -76,6 +69,9 @@ For this analysis, I will consider the relative change in GHG levels compared to
  
 base <- cait_subsector %>% filter(year==2000) %>% select(country, sector, base = value) %>% na.omit()
 cait_ch <- inner_join(cait_subsector,  base, by=c("country", "sector")) %>% mutate(change = round((value-base)/base*100,2)) %>% filter(year>= 2000)
+
+head(cait_ch %>% filter(year==2017) %>% select(country, sector, year, value, change)) 
+
 ```
 
 For regional-level analysis, calculated the change in total GHG since 2000 by region and OECD membership. Since the original dataset does not contain country meta data, I sourced another dataset provided by [World Integrated Trade Solution](https://wits.worldbank.org/CountryProfile/Metadata/en/Country/All).
@@ -85,17 +81,76 @@ For regional-level analysis, calculated the change in total GHG since 2000 by re
 meta <- read.csv("data/WITSCountryProfile.csv", sep=",") %>% clean_names() %>% mutate(OECD = ifelse(other_groups=="OECD", T, F)) %>% select(country=country_name, region, OECD) 
 cait_meta <- left_join(cait_ch, meta, by="country") %>% filter(region!=is.na(region)) %>% filter(region!="") %>% select(-base, -change)
 
+head(cait_meta %>% filter(year==2017) %>% select(country, region, OECD, sector, value, year))
+```
+
+```{r}
 # Calculate the total GHG and their change since 2000 by region
 region <- cait_meta %>% group_by(region, sector, year) %>% summarise(value=sum(value, rm.na=T)) 
 base_reg <-  region %>% filter(year==2000) %>% select(region, sector, base = value) 
 region_ch <- inner_join(region,  base_reg, by=c("region", "sector")) %>% mutate(change = round((value-base)/base*100,2)) %>% filter(year>= 2000)
 
+head(region_ch %>% filter(year==2017) %>% select(region, sector, value, change, year))
+
+```
+
+```{r}
 # Calculate the total GHG and their change in 2000 by OECD membership
 oecd <- cait_meta %>% group_by(OECD, sector, year) %>% summarise(value=sum(value, rm.na=T)) 
 base_oecd <- oecd %>% filter(year==2000) %>% select(OECD, sector, base = value) 
 oecd_ch <- inner_join(oecd,  base_oecd, by=c("OECD", "sector")) %>% mutate(change = round((value-base)/base*100,2)) %>% filter(year>= 2000) %>% mutate(country=ifelse(OECD==TRUE, "OECD", "non-OECD")) %>% ungroup() %>% select(-OECD)
 
+head(oecd_ch %>% filter(year==2017) %>% select(country, sector, value, change, year))
 ```
+
+## Analysis of GHG from electricity and transport sectors
+
+### Electricity and transport account for almost 50% of global GHG emisisons 
+
+Yes, that's right. The electricity and transport take up a HUGE chunk (50%!) of global GHG emissions. That's why they must be priortized in decarbonization efforts, although other sectors are important, too.  
+
+The following code produces a table that summarizes sector breakdown of world's GHG emissions in 2017. I made in into a function so that you can reproduce the table for other countries easily.
+
+```{r}
+## Parameters
+select_country <- "World" #Choose which country you want to summarize
+select_year <- 2017 # Choose which year you want to focus on
+
+# 1. Subset data
+summary_table <- function(select_country, select_year) {
+
+country <- cait_meta %>% filter(country==select_country, year==select_year) 
+
+# Calculate shares per sector
+country_summary_sector <- country %>% group_by(sector) %>%
+  summarize(sector_total = round(sum(value),0)) %>% 
+  mutate(share=sector_total/sum(sector_total)) %>%
+  mutate(category = ifelse(sector %in% energy_sub, "Energy", sector)) %>%
+  mutate(sector = ifelse(sector %in% energy_sub, sector, "-")) %>%
+  arrange(desc(share), .by_group=TRUE)
+
+
+# Create a gt table
+
+country_summary <- country_summary_sector %>%
+  dplyr::group_by(category) %>% 
+  gt(rowname_col="sector", groupname_col="category") %>%
+  tab_header(
+    title=md(paste("Sector breakdown of ", select_country,"'s", " GHG in ",select_year))
+  ) %>%
+  tab_source_note(md("Data source: Climate Watch Data Explorer")) %>%
+  cols_align(align="center", columns=vars(sector_total, share)) %>%
+  cols_label(sector_total = "GHG in MtCO₂e", share="Share") %>%
+  fmt_number(columns=vars(sector_total), sep_mark=",", decimals=0) %>%
+  fmt_percent(columns=vars(share), decimals=1)
+
+country_summary
+
+}
+
+summary_table("World", 2017)
+```
+
 
 ### Top 6 emitters are reducing GHG in the electricity sector, but not so much for transportation.
 

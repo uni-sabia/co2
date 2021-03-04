@@ -1,0 +1,84 @@
+---
+title: "Sector breakdown of GHG in 2017 for the world and by country"
+author: "Uni Lee"
+date: "1/22/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Today, we will create a function that provides you with a sector breakdown of world's greenhouse gas (GHG) emisisons. 
+
+## Data Source
+
+We will use data provided by Climate Watch Data Explorer. 
+
+## Data Preparation
+
+```{r}
+sub <- category$subsector_1[category$sector=="Energy"]
+big_sector <- unique(category$sector)
+
+# Sector-level dataset
+cait_subsector <- cait_raw %>% filter(!str_detect(sector, "^Total")) %>% 
+  filter(sector != "Energy") %>% na.omit() 
+
+# Create a new column for the base level (GHG level in 2000). # Calculate the relative change in GHG compared to the base value. 
+base <- cait_subsector %>% filter(year==2000) %>% select(country, sector, base = value) %>% na.omit()
+cait_ch <- inner_join(cait_subsector,  base, by=c("country", "sector")) %>% mutate(change = round((value-base)/base*100,2)) %>% filter(year>= 2000)
+
+# Add country metadata, in case we need that later. 
+meta <- read.csv("data/WITSCountryProfile.csv", sep=",") %>% clean_names() %>% mutate(OECD = ifelse(other_groups=="OECD", T, F)) %>% 
+  select(country=country_name, region, OECD) 
+cait_meta <- left_join(cait_ch, meta, by="country") # %>% filter(region!=is.na(region)) %>% filter(region!="") %>% select(-base, -change)
+
+```
+
+# Function
+
+```{r}
+
+## Parameters
+select_country <- "World"
+select_year <- 2017
+
+# 1. Subset data
+summary_table <- function(select_country, select_year) {
+
+country <- cait_meta %>% filter(country==select_country, year==select_year) 
+
+# Calculate shares per sector
+country_summary_sector <- country %>% group_by(sector) %>%
+  summarize(sector_total = round(sum(value),0)) %>% 
+  mutate(share=sector_total/sum(sector_total)) %>%
+  mutate(category = ifelse(sector %in% energy_sub, "Energy", sector)) %>%
+  mutate(sector = ifelse(sector %in% energy_sub, sector, "-")) %>%
+  arrange(desc(share), .by_group=TRUE)
+
+
+# Create a gt table
+
+country_summary <- country_summary_sector %>%
+  dplyr::group_by(category) %>% 
+  gt(rowname_col="sector", groupname_col="category") %>%
+  tab_header(
+    title=md(paste("Sector breakdown of ", select_country,"'s", " GHG in ",select_year))
+  ) %>%
+  tab_source_note(md("Data source: Climate Watch Data Explorer")) %>%
+  cols_align(align="center", columns=vars(sector_total, share)) %>%
+  cols_label(sector_total = "GHG in MtCO₂e", share="Share") %>%
+  fmt_number(columns=vars(sector_total), sep_mark=",", decimals=0) %>%
+  fmt_percent(columns=vars(share), decimals=1)
+
+country_summary
+
+}
+
+summary_table("United States", 2017)
+```
+
+Maybe add a tree chart?! 
+
+
