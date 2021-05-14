@@ -11,64 +11,124 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(kableExtra)
 library(ggplot2)
+library(stringr)
+library(tidyverse)
+library(ggpubr)
 ```
 
-Who are the largest corporate CO2 emitters in South Korea? Has the Emissions Trading System in Korea (K-ETS) been effective in reducing their emissions? In this blog post, I will analyze 2019 corporate carbon emissions data from South Korea's Greenhouse Gas Inventory and Research Center (http://www.gir.go.kr/home/index.do?menuId=37) in combination with the K-ETS CO2 permit allocation data provided by Newstapa (https://data.newstapa.org/datasets/%EC%98%A8%EC%8B%A4%EA%B0%80%EC%8A%A4-%EB%B0%B0%EC%B6%9C%EA%B6%8C-%ED%95%A0%EB%8B%B9%EB%9F%89), and macroeconomic data provided by the World Bank. After reading this article, you'll find out 
+Who are the largest corporate CO2 emitters in South Korea? Has the Emissions Trading System in Korea (K-ETS) been effective in reducing their emissions? In this blog post, I will analyze 2019 corporate carbon emissions data from [South Korea's Greenhouse Gas Inventory and Research Center](http://www.gir.go.kr/home/index.do?menuId=37) in combination with the K-ETS CO2 permit allocation data provided by [Newstapa](https://data.newstapa.org/datasets/%EC%98%A8%EC%8B%A4%EA%B0%80%EC%8A%A4-%EB%B0%B0%EC%B6%9C%EA%B6%8C-%ED%95%A0%EB%8B%B9%EB%9F%89). After reading this article, you'll find out 
 
-* Top 10 corporate carbon emitters' change in carbon emissions 2011-2016
-* Comparison between their actual carbon emissions and allocation of CO2 certificates (permits)
+* Have corporate emissions decreased since the launch of K-ETS system in 2015?  
+* Who are the top 10 corporate carbon emitters? 
+* Comparison between their actual carbon emissions and allocation of CO2 allowance (permits)
 
 
 # What is K-ETS? 
 
-In 2015, South Korea adopted Emissions Trading System (K-ETS) in order to reduce its greenhouse gas emissions by 24.4% below the 2017 level. It is a cap-and-trade system that puts a cap on carbon emissions on 685 companies by distributing CO2 allowances (permits) based on individual company's emissions history. That is, if a company is carbon-intensive, it would receive more CO2 permits than those that are less carbon-intensive. If a company emits more CO2 than the allocated amount, it would have to purchase permits from other companies, which cost about $27.62 per tonne of CO2 equivalent in 2020. For more information on K-ETS system, check out the latest report from the [International Carbon Action Partnership (ICAP)](https://icapcarbonaction.com/en/?option=com_etsmap&task=export&format=pdf&layout=list&systems%5B%5D=47).
+In 2015, South Korea launched Emissions Trading System (K-ETS) to reduce its greenhouse gas emissions by 24.4% below the 2017 level. It is a cap-and-trade system that puts a cap on carbon emissions on 685 companies by distributing CO2 allowances (permits) based on individual company's emissions history. That is, if a company is carbon-intensive, it would receive more CO2 permits than those that are less carbon-intensive. If a company emits more CO2 than the allocated amount of allowances, it would have to purchase permits from other companies, which cost about $27.62 per tonne of CO2 equivalent in 2020 [(World Bank Carbon Pricing Dashboard)](https://carbonpricingdashboard.worldbank.org/map_data). For more information on K-ETS system, check out the latest report from the [International Carbon Action Partnership (ICAP)](https://icapcarbonaction.com/en/?option=com_etsmap&task=export&format=pdf&layout=list&systems%5B%5D=47).
 
-K-ETS system has received much criticism for being too generous with the free allocation of allowances. The companies that are obliged to participate in the cap-and-trade market received the allowances for free. [Newstapa](https://newstapa.org/article/eRQBR), an independent journalism agency in South Korea, recently revealed that the carbon-intensive companies received more allowances than their actual emissions. This gave the companies no incentive to reduce carbon emissions. In fact, they even made extra profit by selling the carbon allowances! 
+K-ETS system has received much criticism for being too generous with the free allocation of allowances. [Newstapa](https://newstapa.org/article/eRQBR), an independent journalism agency in South Korea, recently revealed that the carbon-intensive companies received more allowances than their actual emissions. This gave the companies no incentive to reduce carbon emissions. They even made an extra profit by selling the carbon allowances! 
 
 Newstapa's investigation result was a shock for me. I couldn't believe that a system that was designed to stimulate corporate climate action could be failing that hard. So I decided to dig into the data that were used for the investigation. 
 
 # Data 
 
-[South Korea's Greenhouse Gas Inventory and Research Center](http://www.gir.go.kr/home/index.do?menuId=37) publishes corporate carbon emissions data annually. We will analyze data from 2014 (one year before K-ETS was introduced) until 2019. Newstapa has made the CO2 permit allocation data publicly available on their [Data Portal](https://data.newstapa.org/datasets/%EC%98%A8%EC%8B%A4%EA%B0%80%EC%8A%A4-%EB%B0%B0%EC%B6%9C%EA%B6%8C-%ED%95%A0%EB%8B%B9%EB%9F%89). Both datasets are in Korean. 
+[South Korea's Greenhouse Gas Inventory and Research Center](http://www.gir.go.kr/home/index.do?menuId=37) publishes corporate carbon emissions data annually. We will analyze data from 2015 until 2019. Newstapa has made the CO2 permit allocation data publicly available on their [Data Portal](https://data.newstapa.org/datasets/%EC%98%A8%EC%8B%A4%EA%B0%80%EC%8A%A4-%EB%B0%B0%EC%B6%9C%EA%B6%8C-%ED%95%A0%EB%8B%B9%EB%9F%89). Both datasets are in Korean. 
 
-I merged the datasets by company name using the VLOOKUP function on Google Sheet. I used Google Sheet because I can use the GOOGLETRANSLATE function to automatically translate the excel file. If you ever need to translate a spreadsheet, I highly recommend using this function! 
+I merged the datasets by company name using the VLOOKUP function on Google Sheet. Then I applied the GOOGLETRANSLATE function to automatically translate the excel file. If you ever need to translate a spreadsheet, I highly recommend using this function! 
 
 ![Googletranslate function](figure/googletranslate.png)
 
 # Data Cleaning
 
-The resulting dataset contains names of companies subjected to carbon pricing, their sectors, annual carbon emissions and allowances that they received for free from 2015 until 2019. Before we begin our analysis, let us identify the top 10 carbon-emitting companies in 2019.
+The resulting dataset contains names of companies subjected to carbon pricing, their sectors, annual carbon emissions, and allowances that they received for free from 2015 until 2019. Before we begin our analysis, we will clean the dataset using the following code.
 
-```{r}
+```{r warning=FALSE}
 co2_raw <- read.csv("data/kr_corporate_co2.csv")
 co2 <- co2_raw %>%
-  mutate_at(vars(emissions_t, energy_consumption_tj), as.numeric) # Sort by 2019 emissions in descending order 
+  mutate(allowance_t =
+           replace_na(allowance_t, "0")) %>% # Replace NAs in allowance with 0 
+  mutate_at(vars(emissions_t, allowance_t), as.numeric) %>% # Change column types
+  drop_na(emissions_t) #Drop NAs in emissions
+```
 
+# Have corporate emissions decreased since the launch of the K-ETS system in 2015?  
+
+The following graph shows the change in corporate carbon emissions and allowances from 2015 until 2018. The red line indicates the annual emissions and the blue bars indicate annual allowances. In comparison to 2015, corporate emissions increased by 5.7% (627 million tCO2eq). The increase was the highest in 2018 (close to 10%!). Visually, we can easily see that the emissions (reported at the end of the year) and the allowances (announced at the beginning of the year) are highly correlated. Since I won't do a linear regression analysis that controls for omitted variables such as GDP here, I cannot say whether there is a causal relationship between the two. But I would guess that the emissions reductions could be higher if CO2 allowances were set to a lower level. 
+
+```{r}
+# Summarize corporate-level data by year
+co2_summary <- co2 %>% group_by(year) %>%
+  summarize(
+  total_emissions = sum(emissions_t)/1000000,
+  total_allowances = sum(allowance_t)/1000000
+) %>% 
+  mutate(emissions_2015 = total_emissions[which(year==2015)],
+         prc_diff = round((total_emissions-emissions_2015)/emissions_2015*100, 2)) # Calculate percentage difference relative to 2015
+
+ggplot(co2_summary, aes(x=year)) +
+  geom_bar(aes(y=total_allowances, fill=year), stat="identity", width=0.65) +
+  geom_line(aes(y=total_emissions), color="red") +
+  geom_point(aes(y=total_emissions), color="red") +
+  ylim(0, 800) + 
+  theme_classic() + 
+  labs(y="in million tCO2eq",
+       title = "Change in corporate CO2 emissions and allowances",
+       subtitle = "Red line: annual emissions, blue bars: annual allowances") + 
+  theme(axis.title.x = element_blank(),
+        legend.position="none") 
+  
+```
+
+# Who were the major carbon-emitting companies in 2019? 
+
+POSCO,  Korea South-East Power, Korea Southern Power Co.Ltd., Korea Western Power, Korea Midland Power, Hyundai Steel, Samsung Electronics, Ssangyong Cement, and S-Oil emitted the most carbon dioxide in South Korea. Five of them are electricity generation companies. (This is not surprising because [less than 5% of the electricity comes from renewable sources](https://www.index.go.kr/unify/idx-info.do?idxCd=4292)). 
+
+What drew my attention to this table is the fact that the top emitter, POSCO and Ssangyoung Cement Industry received more allowance than their actual emissions. Is it because POSCO and Ssangyoung actually reduced carbon emissions or was the cap not high enough for these companies? This question remains ambiguous. 
+
+```{r}
 # Top 10 carbon-emitting companies
 co2_2019 <- co2 %>% filter(year==2019) %>% arrange(desc(emissions_t)) %>%
-  select(-sector_kor, -energy_consumption_tj, -year, allowance_t)
+  mutate(emissions_mil.t = round(emissions_t/1000000, 2),
+         allowance_mil.t = round(allowance_t/1000000, 2)) %>%
+  select(-sector_kor, -energy_consumption_tj, -year, -allowance_t, -emissions_t, -sector_eng_big)
 
 head(co2_2019, 10) %>% kbl(caption="Top 10 carbon-intensive South Korean companies in 2019") %>%
   kable_classic()
 ```
 
-POSCO,  Korea South-East Power, Korea Southern Power Co.Ltd., Korea Western Power, Korea Midland Power, Hyundai Steel, Samsung Electronics, Ssanyong Cement and S-Oil emitted the most carbon dioxide in South Korea. 5 of them are electricity generation companies. This is not surprising because [less than 5% of the electricity comes from renewable sources](https://www.index.go.kr/unify/idx-info.do?idxCd=4292). 
-
-How were these companies affected by the K-ETS system since its inception in 2015? The following graph shows the change in annual emissions in the last 5 years. 
+While answering this question is also out of the scope of this blog, I will visually explore the emissions and allowance data for POSCO and Ssangyong Cement. The red line represents annual emissions and the blue line represents annual allowance granted to the company. 
 
 ```{r}
-posco_co2 <- co2 %>% filter(name_eng == "POSCO") 
+posco_co2 <- co2 %>% filter(name_eng %in% c("POSCO")) %>% # Subset POSCO data 
+  mutate(prc_diff = round((allowance_t - emissions_t)/emissions_t*100,2)) # Calculate difference between emissions and allowance in each year
 
-ggplot(posco_co2, aes(x=year)) + 
-  geom_line(aes(y=emissions_t)) +
-  geom_line(aes(y=allowance_t), color="red") 
-```
+posco <- ggplot(posco_co2, aes(x=year)) + 
+  geom_line(aes(y=emissions_t/1000000), color="red") +
+  geom_line(aes(y=allowance_t/1000000), color="blue") +
+  theme_classic() +
+  labs(title = "POSCO",
+       y = "in million tCO2eq") 
 
+ssangyong_co2 <- co2 %>% filter(name_eng == "Ssangyong Cement Industrial Co., Ltd.") %>% 
+  mutate(prc_diff = round((allowance_t - emissions_t)/emissions_t*100,2)) 
 
-Reference
+ssangyong <- ggplot(ssangyong_co2, aes(x=year)) + 
+  geom_line(aes(y=emissions_t/1000000), color="red") +
+  geom_line(aes(y=allowance_t/1000000), color="blue") +
+  theme_classic() +
+  labs(title = "Ssangyong Cement",
+       y = "in million tCO2eq") 
 
-World Bank Carbon Pricing Dashboard https://carbonpricingdashboard.worldbank.org/map_data
+ggarrange(posco, ssangyong)
+``` 
 
-https://newstapa.org/article/eRQBR
+POSCO's emissions have been drastically increased since 2016. Until 2018, the amount of allowance granted to this company was higher than their emissions up to about 14.22% (2017). Peculiarly, even though POSCO's emissions increased in 2016-2017, POSCO was financially rewarded (POSCO could make profits from selling the surplus allowances). 
 
-https://icapcarbonaction.com/en/?option=com_attach&task=download&id=723
+Ssanyong's emissions have been decreasing steadily since 2015. Since 2017, their emissions level decreased below the allowance by 3-4%.
+
+# Unanswered questions
+
+I would love to continue exploring the relationship between corporate emissions and allowances. How can we measure the effectiveness of the K-ETS system on reducing corporate carbon emissions? How do we optimize the number of allowances? How can we prevent financially rewarding companies that did not decrease carbon emissions, like POSCO? 
+
+If you have any feedback or comments on this exploratory analysis or ideas for future research, I would like to hear from you! 
