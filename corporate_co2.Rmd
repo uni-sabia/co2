@@ -37,7 +37,6 @@ Newstapa's investigation result was a shock for me. I couldn't believe that a sy
 
 I merged the datasets by company name using the VLOOKUP function on Google Sheet. Then I applied the GOOGLETRANSLATE function to automatically translate the excel file. If you ever need to translate a spreadsheet, I highly recommend using this function! 
 
-![Googletranslate function](figure/googletranslate.png)
 
 # Data Cleaning
 
